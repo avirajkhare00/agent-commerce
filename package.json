@@ -5,13 +5,31 @@
   "description": "Standalone Solana / x402 agent payments service (Paperclip-adjacent, no Paperclip code changes).",
   "type": "module",
   "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "build": "tsc",
+    "start": "node dist/server.js",
     "typecheck": "tsc --noEmit",
-    "build": "tsc"
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate",
+    "db:push": "drizzle-kit push"
   },
   "engines": {
     "node": ">=20"
   },
+  "dependencies": {
+    "@hono/node-server": "^1.14.1",
+    "bs58": "^6.0.0",
+    "dotenv": "^16.4.7",
+    "drizzle-orm": "^0.38.4",
+    "hono": "^4.7.4",
+    "postgres": "^3.4.5",
+    "tweetnacl": "^1.0.3",
+    "zod": "^3.24.2"
+  },
   "devDependencies": {
+    "@types/node": "^22.13.10",
+    "drizzle-kit": "^0.30.4",
+    "tsx": "^4.19.3",
     "typescript": "^5.7.3"
   }
 }
