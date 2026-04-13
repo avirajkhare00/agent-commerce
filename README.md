@@ -1,6 +1,15 @@
 # Agent Commerce
 
-Standalone service for **Solana settlement**, **x402-style** paid HTTP, **wallet linking**, and **payment intents** next to [Paperclip](https://github.com/paperclipai/paperclip). This repo is intentionally **not** part of the Paperclip monorepo: it can live beside a Paperclip checkout for local development.
+Standalone service for **Solana settlement**, **x402-style** paid HTTP, **wallet linking**, and **payment intents** next to [Paperclip](https://github.com/paperclipai/paperclip).
+
+**How people install each piece**
+
+| Product | Typical install | Needs full GitHub clone? |
+|---------|-----------------|---------------------------|
+| **Paperclip** | [`paperclipai` on npm](https://www.npmjs.com/package/paperclipai) — `pnpm dlx paperclipai`, `npm i -g paperclipai`, or add as a dependency | **No** — customers use the published CLI/package |
+| **Agent Commerce** | This repository (clone) or your own image / Helm chart | **Yes, for now** — an npm package is **not** published yet (see [Distribution](#distribution-today-vs-future)) |
+
+Commerce only needs Paperclip’s **HTTP origin** (`base_url`) and a **bearer token**; it does not care whether Paperclip was installed from npm, pnpm, or a container.
 
 ## Layout
 
@@ -15,14 +24,21 @@ Install **without** joining a parent pnpm workspace:
 ```sh
 cd agent-commerce
 pnpm install --ignore-workspace
-cp .env.example .env
+cp .env.example .env   # sets DATABASE_URL to localhost:5433 — matches docker-compose.yml
 docker compose up -d
 pnpm db:migrate
 pnpm dev
 ```
 
-- API: `http://localhost:3210` (override with `PORT`).
-- Health: `GET /health`
+- API: `http://localhost:3210` (override with `PORT` in `.env`).
+- Health: `GET /health` → `{"ok":true,"service":"agent-commerce"}`
+
+`pnpm dev` and `pnpm db:migrate` read **`DATABASE_URL`** from the environment or from `.env` (via `dotenv` when starting the server). If you skip `.env`, export it explicitly, for example:
+
+```sh
+export DATABASE_URL=postgres://postgres:postgres@127.0.0.1:5433/agent_commerce
+pnpm db:migrate && pnpm dev
+```
 
 ### Bootstrap tenant
 
@@ -56,6 +72,25 @@ Save the returned `apiKey`; use `Authorization: Bearer <apiKey>` for all other `
 | POST | `/v1/x402-receipts` | Record paid-HTTP proof from an agent runtime |
 
 Intent state machine: `draft` → `pending_approval` → `approved` → `submitted` → `confirmed` (see `src/services/intents.ts`).
+
+## Install Paperclip for integration (npm · no clone)
+
+Most operators **do not** clone the Paperclip monorepo. They install the published CLI:
+
+```sh
+# examples — use whichever matches your workflow
+pnpm dlx paperclipai --help
+# or
+npm install -g paperclipai
+paperclipai --help
+```
+
+Start Paperclip per [upstream docs](https://github.com/paperclipai/paperclip); note the **origin URL** and port (often `http://localhost:3100`). Use that value as Commerce `base_url` when calling `PUT /v1/paperclip-connection`.
+
+## Distribution (today vs future)
+
+- **Today:** run Agent Commerce from this repo (`pnpm dev` / `pnpm build` + `pnpm start`) or bake the `dist/` output into your own container image.
+- **Future:** publishing a versioned npm package (e.g. CLI or library) is possible but **not done yet**; track releases in this repo when that lands.
 
 ## Paperclip integration guide
 
