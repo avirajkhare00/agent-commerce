@@ -7,9 +7,76 @@ Standalone service for **Solana settlement**, **x402-style** paid HTTP, **wallet
 | Product | Typical install | Needs full GitHub clone? |
 |---------|-----------------|---------------------------|
 | **Paperclip** | [`paperclipai` on npm](https://www.npmjs.com/package/paperclipai) — `pnpm dlx paperclipai`, `npm i -g paperclipai`, or add as a dependency | **No** — customers use the published CLI/package |
-| **Agent Commerce** | This repository (clone) or your own image / Helm chart | **Yes, for now** — an npm package is **not** published yet (see [Distribution](#distribution-today-vs-future)) |
+| **Paperclip → Commerce UI (optional)** | [`@avirajkhare/agent-commerce-bridge` on npm](https://www.npmjs.com/package/@avirajkhare/agent-commerce-bridge) — install from the Paperclip board **Plugins** UI | **No** |
+| **Agent Commerce** (this API) | This repository ([`avirajkhare00/agent-commerce`](https://github.com/avirajkhare00/agent-commerce)) — clone, Docker, or your own image | **Yes, for now** — the HTTP service is source-first (see [Distribution](#distribution-today-vs-future)) |
 
 Commerce only needs Paperclip’s **HTTP origin** (`base_url`) and a **bearer token**; it does not care whether Paperclip was installed from npm, pnpm, or a container.
+
+## Paperclip board plugin (`@avirajkhare/agent-commerce-bridge`)
+
+Use this when you want a **Commerce console inside Paperclip** (tenant, Paperclip bridge, wallets, intents) without cloning Paperclip to add code.
+
+- **npm:** [https://www.npmjs.com/package/@avirajkhare/agent-commerce-bridge](https://www.npmjs.com/package/@avirajkhare/agent-commerce-bridge)  
+- **Stable plugin id:** `avirajkhare.agent-commerce-bridge`
+
+### 1) Run Agent Commerce
+
+Follow [Quick start](#quick-start) in this repo. Note your API origin (e.g. `http://127.0.0.1:3210` from `PORT` in `.env`).
+
+### 2) Create a tenant and get the **tenant API key**
+
+If `BOOTSTRAP_ADMIN_TOKEN` is set in `.env`:
+
+```sh
+curl -sS -X POST "http://127.0.0.1:3210/v1/tenants" \
+  -H "Authorization: Bearer $BOOTSTRAP_ADMIN_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"name":"My team","slug":"my-unique-slug"}'
+```
+
+Copy **`apiKey`** from the JSON. That value is **only shown once** — it is **not** the same as `BOOTSTRAP_ADMIN_TOKEN` (bootstrap is only for creating tenants).
+
+Use `Authorization: Bearer <apiKey>` for all `/v1/*` routes below.
+
+### 3) Install the plugin in Paperclip
+
+1. Open the Paperclip board → **Plugins** (or **Settings → Plugins**).
+2. **Install** → package name: `@avirajkhare/agent-commerce-bridge`
+3. Open the plugin **configuration** and set:
+   - **`commerce_api_base_url`** — Commerce origin only, no path (e.g. `http://127.0.0.1:3210`).
+   - **`commerce_tenant_api_key`** — the tenant **`apiKey`** from step 2 (paste the raw secret; do **not** prefix with `Bearer `).
+
+### 4) Configure the **Paperclip ↔ Commerce** bridge (required for `/v1/paperclip/ping`)
+
+Commerce stores how to reach Paperclip (`base_url` + optional bearer for `/api/health`):
+
+```sh
+export COMMERCE_API_KEY='paste-tenant-apiKey-here'
+curl -sS -X PUT "http://127.0.0.1:3210/v1/paperclip-connection" \
+  -H "Authorization: Bearer $COMMERCE_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"base_url":"http://127.0.0.1:3100","api_key":"x"}'
+```
+
+Replace `base_url` with your real Paperclip origin. If `/api/health` is public in your deployment, `api_key` can be any non-empty placeholder (`x`); otherwise use a Paperclip bearer that can read `/api/health`.
+
+Verify:
+
+```sh
+curl -sS "http://127.0.0.1:3210/v1/paperclip/ping" \
+  -H "Authorization: Bearer $COMMERCE_API_KEY"
+```
+
+Expect `ok: true` and a `url` pointing at `{base_url}/api/health`.
+
+### 5) Localhost / mixed-content notes
+
+- If Paperclip’s plugin runtime **blocks HTTP requests to `127.0.0.1`**, use a **public HTTPS** Commerce URL, a **tunnel** (e.g. ngrok), or follow your Paperclip version’s docs for outbound plugin HTTP to private addresses.
+- If the board is **HTTPS** and Commerce is **HTTP**, the plugin worker can still call Commerce from the server; prefer HTTPS for Commerce in production.
+
+### 6) Using the console
+
+After install, open **Commerce** in the company sidebar. Tabs cover **Overview**, **Tenant**, **Paperclip bridge**, **Wallets**, and **Intents**. Open the page from a **company URL** so company-scoped actions (wallets, new intents) have a `companyId`.
 
 ## Layout
 
@@ -119,7 +186,8 @@ In **local_trusted** mode, `/api/health` is usually reachable **without** a bear
 ## Distribution (today vs future)
 
 - **Today:** run Agent Commerce from this repo (`pnpm dev` / `pnpm build` + `pnpm start`) or bake the `dist/` output into your own container image.
-- **Future:** publishing a versioned npm package (e.g. CLI or library) is possible but **not done yet**; track releases in this repo when that lands.
+- **Paperclip UI:** the optional board plugin is published as **`@avirajkhare/agent-commerce-bridge`** on npm (see [Paperclip board plugin](#paperclip-board-plugin-avirajkhareagent-commerce-bridge) above).
+- **Future:** a versioned npm package for the **Commerce API server itself** (CLI/library) is still possible; track releases in this repo when that lands.
 
 ## Paperclip integration guide
 
@@ -223,7 +291,11 @@ If this repo lives inside a Paperclip working tree, the parent repo may **gitign
 
 ## Remote
 
+Upstream for this service:
+
+**[https://github.com/avirajkhare00/agent-commerce](https://github.com/avirajkhare00/agent-commerce)**
+
 ```sh
-git remote add origin git@github.com:YOUR_ORG/agent-commerce.git
+git remote add origin git@github.com:avirajkhare00/agent-commerce.git
 git push -u origin main
 ```
