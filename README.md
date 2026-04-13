@@ -87,6 +87,35 @@ paperclipai --help
 
 Start Paperclip per [upstream docs](https://github.com/paperclipai/paperclip); note the **origin URL** and port (often `http://localhost:3100`). Use that value as Commerce `base_url` when calling `PUT /v1/paperclip-connection`.
 
+### First start with `paperclipai onboard -y` (headless / CI)
+
+Quickstart **embedded PostgreSQL** can race on the very first `paperclipai run` (migrations still applying while the server boots). If you see `relation "heartbeat_runs" does not exist`, either **run `paperclipai run` again** or point Paperclip at a **real Postgres** before onboarding so migrations finish cleanly:
+
+```sh
+# Example: dedicated Postgres for Paperclip only
+docker run -d --name paperclip-pg -e POSTGRES_PASSWORD=pcsecret -e POSTGRES_DB=paperclip -p 55432:5432 postgres:16-alpine
+
+export DATABASE_URL='postgres://postgres:pcsecret@127.0.0.1:55432/paperclip'
+export PORT=3150   # avoid clashing with another Paperclip on 3100
+rm -rf /tmp/paperclip-home && npx paperclipai@latest onboard -y -d /tmp/paperclip-home
+# onboard ends inside `paperclipai run`; server listens on http://127.0.0.1:3150
+```
+
+Then wire Agent Commerce (replace `COMMERCE_API_KEY` with the value from `POST /v1/tenants`):
+
+```sh
+curl -sS -X PUT http://127.0.0.1:3210/v1/paperclip-connection \
+  -H "Authorization: Bearer $COMMERCE_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"base_url":"http://127.0.0.1:3150","api_key":"optional-if-health-is-public"}'
+
+curl -sS http://127.0.0.1:3210/v1/paperclip/ping \
+  -H "Authorization: Bearer $COMMERCE_API_KEY"
+# expect: {"ok":true,"status":200,"url":"http://127.0.0.1:3150/api/health"}
+```
+
+In **local_trusted** mode, `/api/health` is usually reachable **without** a bearer; Commerce still stores an `api_key` string (any placeholder is fine) and only sends it if the first unauthenticated request returns 401/403.
+
 ## Distribution (today vs future)
 
 - **Today:** run Agent Commerce from this repo (`pnpm dev` / `pnpm build` + `pnpm start`) or bake the `dist/` output into your own container image.
