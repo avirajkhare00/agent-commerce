@@ -1,0 +1,3 @@
+# Own workspace root so `pnpm install` from this directory does not attach to ../paperclip.
+packages:
+  - "."
