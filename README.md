@@ -26,7 +26,7 @@ cd agent-commerce
 pnpm install --ignore-workspace
 cp .env.example .env   # sets DATABASE_URL to localhost:5433 — matches docker-compose.yml
 docker compose up -d
-pnpm db:migrate
+pnpm db:migrate   # reads DATABASE_URL from .env (via drizzle.config.ts + dotenv)
 pnpm dev
 ```
 
